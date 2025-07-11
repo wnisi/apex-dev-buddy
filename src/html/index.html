@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tree View</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-editor-foreground);
+        }
+
+        .tree {
+            list-style: none;
+            padding: 0;
+        }
+
+        .tree li {
+            margin-top: 5px;
+            margin-bottom: 5px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .tree li::before {
+            content: "";
+            position: absolute;
+            top: 5px;
+            left: 0;
+            border-left: 1px solid var(--vscode-editorIndentGuide-activeBackground);
+            bottom: 0px;
+        }
+
+        .tree li:last-child::before {
+            bottom: 10px; /* Adjust for the last item */
+        }
+
+        .tree li span {
+            cursor: pointer;
+            display: inline-block;
+            padding: 2px 5px;
+        }
+
+        .tree li span:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .tree li.parent > span::before {
+            content: "\2BC8"; /* Right arrow */
+            display: inline-block;
+            margin-right: 5px;
+            color: var(--vscode-foreground);
+            font-size: 0.8em;
+        }
+
+        .tree li.parent.open > span::before {
+            content: "\2BC6"; /* Down arrow */
+        }
+
+        .tree ul {
+            list-style: none;
+            padding-left: 20px;
+            display: none; /* Initially hide child nodes */
+        }
+
+        .tree li.parent.open > ul {
+            display: block;
+        }
+
+        /* Visual adjustments for the root level */
+        .tree > li::before {
+            content: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>ApexDoc by Apex DevBuddy</h1>
+    <div style="display: flex;">
+        <div style="width: 30%em;">
+            <button type="button" onclick="vscode.postMessage({ message: 'hello!' });">Click Me!</button>
+
+            <ul class="tree">
+                {treeClasses}
+                <li class="parent open">
+                    <span>Root Node 1</span>
+                    <ul>
+                        <li><span>Child Node 1.1</span></li>
+                        <li class="parent">
+                            <span>Child Node 1.2</span>
+                            <ul>
+                                <li><span>Grandchild Node 1.2.1</span></li>
+                                <li><span>Grandchild Node 1.2.2</span></li>
+                            </ul>
+                        </li>
+                        <li><span>Child Node 1.3</span></li>
+                    </ul>
+                </li>
+                <li class="parent">
+                    <span>Root Node 2</span>
+                    <ul>
+                        <li><span>Child Node 2.1</span></li>
+                        <li><span>Child Node 2.2</span></li>
+                    </ul>
+                </li>
+                <li><span>Root Node 3</span></li>
+            </ul>
+        </div>
+        <div class="homeButton">
+            Inspired by 
+            <a href="https://github.com/SalesforceFoundation/ApexDoc/tree/master">Apex Doc</a>
+        </div>
+        <div class="classPage">
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        document.addEventListener('DOMContentLoaded', () => {
+            const treeNodes = document.querySelectorAll('.tree li.parent > span');
+
+            treeNodes.forEach(node => {
+                node.addEventListener('click', function(event) {
+                    const parentLi = this.parentNode;
+                    parentLi.classList.toggle('open');
+                    vscode.postMessage({ message: this.parentNode.textContent });
+                    event.stopPropagation(); // Prevent triggering parent's event if nested
+                });
+            });
+        });
+        //const treeContainer = document.getElementById('tree-container');
+
+        /**
+         * Recursively renders the tree structure from JSON data.
+         * @param {Array<Object>} nodes - Array of node objects.
+         * @param {HTMLElement} parentElement - The UL element to append nodes to.
+         */
+        function renderTree(nodes, parentElement) {
+            nodes.forEach(node => {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = node.label;
+                span.dataset.id = node.id; // Store ID for click handling
+
+                // Add icon class based on 'type' if available
+                if (node.type) {
+                    span.classList.add(`icon-${node.type}`);
+                }
+
+                li.appendChild(span);
+
+                if (node.children && node.children.length > 0) {
+                    li.classList.add('parent');
+                    // Optionally open root nodes by default or based on a property
+                    if (node.id === 'root1') { // Example: open 'root1' by default
+                       li.classList.add('open');
+                    }
+                    const ul = document.createElement('ul');
+                    li.appendChild(ul);
+                    renderTree(node.children, ul); // Recurse for children
+                }
+
+                parentElement.appendChild(li);
+            });
+        }
+
+        // Add event listener for toggling tree nodes
+        /*treeContainer.addEventListener('click', function(event) {
+            const target = event.target;
+            if (target && target.tagName === 'SPAN' && target.parentNode.classList.contains('parent')) {
+                target.parentNode.classList.toggle('open');
+            }
+
+            // Also, send a message to the extension when a node (span) is clicked
+            if (target && target.tagName === 'SPAN') {
+                vscode.postMessage({
+                    command: 'nodeClicked',
+                    id: target.dataset.id,
+                    label: target.textContent
+                });
+            }
+        });*/
+
+        // Handle messages from the extension
+        window.addEventListener('message', event => {
+            const message = event.data; // The JSON data in the message
+            console.log('Received message data:', message);
+            switch (message.command) {
+                case 'test':
+                    console.log('Received tree data:', message.data);
+                    const classPage = document.getElementsByClassName('homeButton');
+                    classPage[0].innerHTML = '<p>teste will criando html</p>';
+                    
+                    /*treeContainer.innerHTML = ''; // Clear loading message
+                    const rootUl = document.createElement('ul');
+                    rootUl.classList.add('tree');
+                    renderTree(message.data, rootUl);
+                    treeContainer.appendChild(rootUl);*/
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

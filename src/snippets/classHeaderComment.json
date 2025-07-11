@@ -1,0 +1,39 @@
+{
+    "Class Header ApexDoc": {
+      "prefix": ["header", "apexDoc","Class Header ApexDoc"],
+      "body": ["/**",
+        "* @author          : ${1:author}",
+        "* @date            : ${2:DD}-${3:MM}-${4:YYYY}",
+        "*",
+        "* @group           : ${5:group}",
+        "* @group-content   : ${6:groupContent}",
+        "*",
+        "* @description     : ${7:ClassDescription}",
+        "Modification Log:",
+        "Ver   Date         Author                       Modification",
+        "*/"],
+      "description": "ApexDoc Header."
+    },
+    "Class Version ApexDoc":{
+        "prefix":["apexDoc", "Class Version", "header"],
+        "body":["${1:VersionNumber}   ${2:date}   ${3:modifiedBy}                      ${4:ModificationDescription}"],
+        "description": "Class Version ApexDoc"
+    },
+
+    "Method Header ApexDoc":{
+        "prefix":["header","apexDoc","Method Header ApexDoc"],
+        "body": ["/*",
+                "*********************************************************",
+                "",
+                "@description            : ${1:description}",
+                "@param ${2:paramName}   : ${3:params}",
+                "@param ${4:paramName}   : ${5:params}",
+                "@return                 : ${6:return}",
+                "@example                : ${7:example}",
+                "",
+                "*********************************************************",
+                "*/"
+        ],
+        "description":"ApexDoc Method Header"
+    }
+  }
