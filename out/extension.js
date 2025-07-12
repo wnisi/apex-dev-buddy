@@ -165,11 +165,17 @@ async function clearEmptyLines() {
         }
         // 2. Perform your modification (example: add a line at the beginning)
         //const modifiedContent = `// Modified by Clear Empty Line\n//CharacteresCleaned: ${quantityOfCharacteresCleaned}\n${newFileClean}`;
-        const modifiedContent = newFileClean;
+        const modifiedContent = clearSystemDebugs(newFileClean);
         // 3. Write the modified content back to the file
         await vscode.workspace.fs.writeFile(file, new TextEncoder().encode(modifiedContent));
     }
     return quantityOfCharacteresCleaned;
+}
+function clearSystemDebugs(codeString) {
+    const regex = /System\.Debug\([^)]*\);?/gi;
+    // Replace all matches with an empty string
+    const cleanedCode = codeString.replace(regex, '');
+    return cleanedCode;
 }
 async function loadClassesTree() {
     const classAccess = ['private', 'public', 'global'];
