@@ -150,7 +150,7 @@ async function getQuantityOfEmptyLines() {
     return quantityOfCharacteresCleaned;
 }
 async function clearEmptyLines() {
-    const files = await vscode.workspace.findFiles('**\\classes\\*DataFactory.{cls}');
+    const files = await vscode.workspace.findFiles('**' + lwcFolderPath + '**.{cls}');
     let quantityOfCharacteresCleaned = 0;
     for (const file of files) {
         const fileContent = fs.readFileSync(file.fsPath, 'utf-8');
