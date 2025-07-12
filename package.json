@@ -1,12 +1,27 @@
 {
-  "name": "apex-dev-buddy",
-  "displayName": "apex-dev-buddy",
+  "name": "apex-Dev-buddy",
+  "displayName": "Apex Dev Buddy",
   "description": "",
+  "publisher": "WilliamNisidozi",
   "version": "0.0.1",
+  "repository": "https://github.com/wnisi/apex-dev-buddy",
+  "icon": "img/icon.png",
+  "keywords": [
+    "sfdx",
+    "salesforcedx",
+    "salesforce",
+    "Apex Doc",
+    "ApexDoc",
+    "Apex",
+    "Salesforce Apex",
+    "Apex Dev Buddy",
+    "Buddy"
+  ],
   "engines": {
     "vscode": "^1.54.0"
   },
   "categories": [
+    "Extension Packs",
     "Other"
   ],
   "activationEvents": [],
@@ -15,7 +30,7 @@
     "commands": [
       {
         "command": "apex-dev-buddy.helloWorld",
-        "title": "Hello World"
+        "title": "ApexDoc by Dev Buddy"
       },
       {
         "command": "apex-dev-buddy.clearEmptyLineClasses",
