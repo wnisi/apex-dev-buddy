@@ -187,7 +187,10 @@ async function clearEmptyLines(execClearSystemDebugs) {
 function clearSystemDebugs(codeString) {
     // Store the original length
     const originalLength = codeString.length;
-    const regex = /System\.Debug\([^)]*\);?/gi;
+    const regex = /System\.Debug\([^)]*\)\)?;/gi;
+    //REGEX BASICO -> /System\.Debug\([^)]*\);?/gi;
+    //REGEX COM FUNCTION DENTRO -> System\.Debug\([^)]*\)\);
+    //const regex = /System\.Debug\([^)]*\);?/gi;
     // Perform the replacement
     const cleanedCode = codeString.replace(regex, '');
     // Calculate characters removed
