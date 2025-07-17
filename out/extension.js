@@ -41,7 +41,7 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs")); // Import the 'fs' module
 const os = __importStar(require("os"));
-const lwcFolderPath = os.platform() === 'win32' ? '\\force-app\\main\\default\\classes\\' : '/force-app/main/default/classes/';
+const classFolderPath = os.platform() === 'win32' ? '\\force-app\\main\\default\\classes\\' : '/force-app/main/default/classes/';
 const pathSeparator = os.platform() === 'win32' ? '\\' : '/';
 class ApexDocObject {
     name;
@@ -67,7 +67,7 @@ class TreeClassNode {
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 function activate(context) {
-    lwcFolderPath;
+    classFolderPath;
     pathSeparator;
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     // This line of code will only be executed once when your extension is activated
@@ -88,13 +88,18 @@ function activate(context) {
         getWebviewContent(context).then(res => {
             panel.webview.html = res;
         });
-        panel.webview.postMessage({ message: "test" });
+        //panel.webview.postMessage({message:"test"});
         panel.webview.onDidReceiveMessage(async (message) => {
             console.log(message);
-            var apexDoxReturn;
+            var apexDocReturn;
             createApexDocByClassName(message.message).then(res => {
-                apexDoxReturn = res;
-                panel.webview.postMessage({ command: apexDoxReturn });
+                apexDocReturn = res;
+                panel.webview.postMessage({
+                    command: {
+                        action: 'displayDetails',
+                        apexDocReturn
+                    }
+                });
             });
         });
     });
@@ -110,7 +115,7 @@ function activate(context) {
         );
         let emptyLinesResult;
         panel.webview.html = getWebviewContentLoading();
-        panel.webview.html = getWebviewContentForCleanEmptyLines('N/A');
+        panel.webview.html = getWebviewContentForCleanEmptyLines('N/A', 'N/A');
         /*
                 getQuantityOfEmptyLines().then(res => {
                     emptyLinesResult = res;
@@ -120,7 +125,7 @@ function activate(context) {
             console.log(message);
             var emptyLinesResult;
             if (message.message === 'clearChar') {
-                clearEmptyLines().then(res => {
+                clearEmptyLines(message.execSystemDebug).then(res => {
                     emptyLinesResult = res;
                     //getWebviewContentForCleanEmptyLines(String(emptyLinesResult));
                     panel.webview.postMessage({ qttClearedChar: res });
@@ -136,8 +141,9 @@ function activate(context) {
     context.subscriptions.push(clearEmptyLine);
 }
 async function getQuantityOfEmptyLines() {
-    const files = await vscode.workspace.findFiles('**' + lwcFolderPath + '**.{cls}');
+    const files = await vscode.workspace.findFiles('**' + classFolderPath + '**.{cls}');
     let quantityOfCharacteresCleaned = 0;
+    let quantityOfSystemDebugChars = 0;
     for (const file of files) {
         const fileContent = fs.readFileSync(file.fsPath, 'utf-8');
         const contentSplitByLine = fileContent.split('\n');
@@ -146,15 +152,22 @@ async function getQuantityOfEmptyLines() {
             const contentTrimmed = contentSplitByLine[line].trimEnd();
             quantityOfCharacteresCleaned = quantityOfCharacteresCleaned + (contentLength - contentTrimmed.length);
         }
+        quantityOfSystemDebugChars += clearSystemDebugs(fileContent).quantityOfCharsRemoved;
     }
-    return quantityOfCharacteresCleaned;
+    return { quantityOfCharacteresCleaned: quantityOfCharacteresCleaned, quantityOfSystemDebugChars: quantityOfSystemDebugChars };
 }
-async function clearEmptyLines() {
-    const files = await vscode.workspace.findFiles('**' + lwcFolderPath + '**.{cls}');
+async function clearEmptyLines(execClearSystemDebugs) {
+    const files = await vscode.workspace.findFiles('**' + classFolderPath + '**.{cls}');
     let quantityOfCharacteresCleaned = 0;
+    let quantityOfSysDebugCleaned = 0;
     for (const file of files) {
-        const fileContent = fs.readFileSync(file.fsPath, 'utf-8');
+        let fileContent = fs.readFileSync(file.fsPath, 'utf-8');
         //const fileContent = new TextDecoder().decode(fileContentBuffer);
+        if (execClearSystemDebugs) {
+            const modifiedContent = clearSystemDebugs(fileContent);
+            quantityOfSysDebugCleaned = +modifiedContent.quantityOfCharsRemoved;
+            fileContent = modifiedContent.cleanedCode;
+        }
         const contentSplitByLine = fileContent.split('\n');
         let newFileClean = '';
         for (var line = 0; line < contentSplitByLine.length; line++) {
@@ -165,17 +178,21 @@ async function clearEmptyLines() {
         }
         // 2. Perform your modification (example: add a line at the beginning)
         //const modifiedContent = `// Modified by Clear Empty Line\n//CharacteresCleaned: ${quantityOfCharacteresCleaned}\n${newFileClean}`;
-        const modifiedContent = clearSystemDebugs(newFileClean);
+        await vscode.workspace.fs.writeFile(file, new TextEncoder().encode(newFileClean));
         // 3. Write the modified content back to the file
-        await vscode.workspace.fs.writeFile(file, new TextEncoder().encode(modifiedContent));
+        //await vscode.workspace.fs.writeFile(file, new TextEncoder().encode(modifiedContent));
     }
-    return quantityOfCharacteresCleaned;
+    return quantityOfCharacteresCleaned + quantityOfSysDebugCleaned;
 }
 function clearSystemDebugs(codeString) {
+    // Store the original length
+    const originalLength = codeString.length;
     const regex = /System\.Debug\([^)]*\);?/gi;
-    // Replace all matches with an empty string
+    // Perform the replacement
     const cleanedCode = codeString.replace(regex, '');
-    return cleanedCode;
+    // Calculate characters removed
+    const charactersRemoved = originalLength - cleanedCode.length;
+    return { cleanedCode: cleanedCode, quantityOfCharsRemoved: charactersRemoved };
 }
 async function loadClassesTree() {
     const classAccess = ['private', 'public', 'global'];
@@ -209,18 +226,23 @@ async function createApexDocByClassName(className) {
         var commentStartLine = null;
         var commentEndLine = null;
         var blockCommentContent = '';
-        const apexDocObj = new ApexDocObject(file.path);
+        const fileName = path.basename(file.fsPath, '.cls');
+        const apexDocObj = new ApexDocObject(fileName);
         for (var i = 0; i <= contentLine.length; i++) {
             if (commentStartLine !== null && commentEndLine !== null) {
                 var isCommentBlock = false;
-                for (var additionalLine = 0; additionalLine <= 2; additionalLine++) {
+                for (var additionalLine = 1; additionalLine <= 3; additionalLine++) {
                     if (contentLine[commentEndLine + additionalLine]) {
                         isCommentBlock = contentLine[commentEndLine + additionalLine].includes('private ') || contentLine[commentEndLine + additionalLine].includes('public ') || contentLine[commentEndLine + additionalLine].includes('global ');
+                        if (isCommentBlock) {
+                            break;
+                        }
                     }
                 }
                 if (isCommentBlock) {
                     headerBlockList = createApexDocObject(apexDocObj, blockCommentContent);
                     commentStartLine = commentEndLine = null;
+                    blockCommentContent = '';
                 }
                 else {
                     commentStartLine = commentEndLine = null;
@@ -311,7 +333,7 @@ async function getWebviewContent(context) {
   </script>
   </html>`; */
 }
-function getWebviewContentForCleanEmptyLines(emptyLinesQuantity) {
+function getWebviewContentForCleanEmptyLines(emptyLinesQuantity, emptyLinesQuantitySysDebug) {
     return `<!DOCTYPE html>
 			<html lang="en">
 			
@@ -338,9 +360,16 @@ function getWebviewContentForCleanEmptyLines(emptyLinesQuantity) {
 			<h1>Welcome to Clear Empty Lines by Dev Buddy!</h1>
 				<div class="loader" style="display:none"></div>
 				<p>Quantity of Character to be cleaned: <p class="emptyLineQtt">${emptyLinesQuantity}</p></p>
+				<p>Quantity of System Debugs Character to be cleaned: <p class="emptyLineQttSysDebug">${emptyLinesQuantitySysDebug}</p></p>
 				<button class="btnClass" type="button" onclick="sendMessageToExt('getQuantity')";">Get quantity of Characters!</button>
+				
 				<br><br>
 				<p>Quantity of Character removed: <p class="clearedLinesQtt">${emptyLinesQuantity}</p></p>
+				 <label>
+				 <input type="Checkbox" id="systemDebugCheckbox" value="Clear System Debugs"/>
+				 Clear System Debugs
+				 </label>
+				 <br>
 				<button class="btnClass" type="button" onclick="sendMessageToExt('clearChar')";" disabled>Clear Characters!</button>
 			</body>
 			<script>
@@ -350,23 +379,32 @@ function getWebviewContentForCleanEmptyLines(emptyLinesQuantity) {
 					allButtons.forEach(btn => {
 						btn.disabled = true;
 					});
-					vscode.postMessage({ message: message });
+					const clearSystemDebugs = document.querySelectorAll('input[id="systemDebugCheckbox"]');
+					let execSystemDebugsVar = false
+					if(clearSystemDebugs){
+						execSystemDebugsVar = clearSystemDebugs[0].checked;
+					}
+					vscode.postMessage({ message: message, execSystemDebug: execSystemDebugsVar});
 				}
 
+
 				window.addEventListener('message', event => {
-            		const message = event.data;
+					const allButtons = document.querySelectorAll('.btnClass');
+					allButtons.forEach(btn => {
+						btn.disabled = false;
+					});
+					const message = event.data;
 					console.log(event.data);
 					if(message.qttClearedChar){
 						const clearedLineQtt = document.querySelector('.clearedLinesQtt');
 						clearedLineQtt.textContent = message.qttClearedChar;
 					} else if (message.qttCharacters){
 						const emptyLineQtt = document.querySelector('.emptyLineQtt');
-						emptyLineQtt.textContent = message.qttCharacters;
+						emptyLineQtt.textContent = message.qttCharacters.quantityOfCharacteresCleaned;
+						const emptyLineQttSysDebug = document.querySelector('.emptyLineQttSysDebug');
+						emptyLineQttSysDebug.textContent = message.qttCharacters.quantityOfSystemDebugChars;
 					}
-					const allButtons = document.querySelectorAll('.btnClass');
-					allButtons.forEach(btn => {
-						btn.disabled = false;
-					});
+					
 
 				});
 			</script>
